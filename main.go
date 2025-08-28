@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"github.com/watsonserve/filed/action"
+	"github.com/watsonserve/filed/services"
 	"github.com/watsonserve/goengine"
 	"github.com/watsonserve/goutils"
 )
@@ -27,12 +28,14 @@ func main() {
 	})
 	rootDir := conf["root"][0]
 	fmt.Printf("root: %s\n", rootDir)
-	d := action.NewAction(dbConn, rootDir)
-	p := action.NewPictureAction(dbConn, rootDir)
+
+	listSrv := services.NewListService(dbConn, rootDir)
+	fileSrv := services.NewFileService(dbConn, rootDir)
+
+	p := action.NewPictureAction(listSrv, fileSrv)
 
 	router := goengine.InitHttpRoute()
-	router.Set("/Pictures/", p.ServeHTTP)
-	router.SetWith("^/.*", d.ServeHTTP)
+	router.StartWith("/Pictures/", p.ServeHTTP)
 	engine := goengine.New(router, nil)
 	http.ListenAndServe(addr, engine)
 }

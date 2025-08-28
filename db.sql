@@ -2,13 +2,13 @@
 CREATE DATABASE res;
 GRANT ALL PRIVILEGES ON DATABASE res TO res;
 CREATE TABLE IF NOT EXISTS res_thumb (
-    id SERIAL PRIMARY KEY,
-    hash char(40) UNIQUE,
-    ext text,
+    id uuid PRIMARY KEY,
+    hash char(64) UNIQUE,
+    ext char[16],
     raw text UNIQUE,
-    size int,
-    rtime TIMESTAMP,
-    ctime TIMESTAMP DEFAULT now()
+    size int DEFAULT 0,
+    rtime int DEFAULT 0,
+    ctime int
 );
 GRANT ALL PRIVILEGES ON TABLE res_thumb TO res;
 GRANT ALL PRIVILEGES ON SEQUENCE res_thumb_id_seq TO res;
