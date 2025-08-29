@@ -29,6 +29,8 @@ func main() {
 	rootDir := conf["root"][0]
 	fmt.Printf("root: %s\n", rootDir)
 
+	sessMgr := goengine.InitSessionManager(goengine.NewRedisStore("", "", 1), "", "", "", "")
+
 	listSrv := services.NewListService(dbConn, rootDir)
 	fileSrv := services.NewFileService(dbConn, rootDir)
 
@@ -36,6 +38,6 @@ func main() {
 
 	router := goengine.InitHttpRoute()
 	router.StartWith("/Pictures/", p.ServeHTTP)
-	engine := goengine.New(router, nil)
+	engine := goengine.New(router, sessMgr)
 	http.ListenAndServe(addr, engine)
 }

@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/watsonserve/filed/helper"
+	"github.com/watsonserve/imghelper"
 )
 
 type FileService struct {
@@ -20,6 +21,10 @@ func NewFileService(dbConn *sql.DB, root string) *FileService {
 	return &FileService{
 		rootPath: path.Clean(root),
 	}
+}
+
+func (d *FileService) GetFilename(req *http.Request) string {
+	return path.Clean(path.Join(d.rootPath, req.URL.Path))
 }
 
 func (d *FileService) SendFile(resp http.ResponseWriter, req *http.Request) {
@@ -66,7 +71,8 @@ func (d *FileService) Upload(resp http.ResponseWriter, req *http.Request) {
 	// 	StdJSONResp(resp, nil, http.StatusBadRequest, "Content-Digest sha-256 Required")
 	// 	return
 	// }
-	absPath := path.Clean(path.Join(d.rootPath, req.URL.Path))
+
+	absPath := d.GetFilename(req)
 	fp, err := os.OpenFile(absPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0660)
 	if nil != err {
 		StdJSONResp(resp, nil, http.StatusNotFound, err.Error())
@@ -80,7 +86,19 @@ func (d *FileService) Upload(resp http.ResponseWriter, req *http.Request) {
 }
 
 func (d *FileService) GenPreview(resp http.ResponseWriter, req *http.Request) {
+	absPath := d.GetFilename(req)
+	mat, err := imghelper.IMRead(absPath)
+	if nil != err {
+		StdJSONResp(resp, nil, http.StatusNotFound, "")
+		return
+	}
 
+	baseName := path.Base(req.URL.Path)
+	preview := path.Join(d.rootPath, "preview", baseName) + ".webp"
+	thumb := path.Join(d.rootPath, "thumb", baseName) + ".webp"
+
+	err = imghelper.IMWrite(mat, preview, 80, 1000)
+	err = imghelper.IMWrite(mat, thumb, 80, 1000)
 	StdJSONResp(resp, nil, http.StatusCreated, "")
 }
 

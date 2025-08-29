@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/watsonserve/goengine"
 )
 
 func GenUUIDStr() (string, error) {
@@ -193,4 +194,10 @@ func Write(fp *os.File, offset int64, src io.Reader) error {
 		_, err = io.Copy(fp, src)
 	}
 	return err
+}
+
+func GetUid(req *http.Request) string {
+	ctx := req.Context()
+	session := ctx.Value("session").(*goengine.Session)
+	return session.Get("uid").(string)
 }
