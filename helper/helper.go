@@ -31,28 +31,57 @@ func GenUUIDStr() (string, error) {
 /**
  * @return baseName
  */
-func CreateNewFile(dir, ext string, perm os.FileMode) (string, error) {
+func createNewFile(dir, ext string, perm os.FileMode) (string, *os.File, error) {
 	if 0 < len(ext) && '.' != ext[0] {
 		ext = "." + ext
 	}
 	if "" == dir || '/' != dir[len(dir)-1] {
 		dir += "/"
 	}
+
 	for i := 0; i < 16; i++ {
 		baseName, err := GenUUIDStr()
 		if nil != err {
-			return "", err
+			return "", nil, err
 		}
-		dst, err := os.OpenFile(path.Join(dir, baseName+ext), os.O_WRONLY|os.O_CREATE|os.O_EXCL, perm)
-		if nil == err {
-			dst.Close()
-			return baseName, err
-		}
-		if !os.IsExist(err) {
-			return "", err
+		fileName := path.Join(dir, baseName+ext)
+		_, err = os.Stat(fileName)
+		if os.IsNotExist(err) {
+			dst, err := os.OpenFile(fileName, os.O_RDWR|os.O_CREATE|os.O_EXCL, perm)
+			return baseName, dst, err
 		}
 	}
-	return "", errors.New("retry timeout")
+	return "", nil, errors.New("retry timeout")
+}
+
+func CreateNewFile(dir, ext, digest string, src io.Reader) (string, int64, int64, error) {
+	siz := int64(0)
+	cTime := int64(0)
+	eTag, fp, err := createNewFile(dir, ext, 0660)
+
+	for nil == err {
+		defer fp.Close()
+
+		siz, err = io.Copy(fp, src)
+		if nil != err {
+			break
+		}
+		_, err = fp.Seek(0, 0)
+		if nil != err {
+			break
+		}
+		var hash string
+		hash, err = Sha256ByFile(fp)
+		if nil != err {
+			break
+		}
+		if hash != digest {
+			err = errors.New("Digest Not Match")
+		}
+		break
+	}
+
+	return eTag, siz, cTime, err
 }
 
 func GetOrigin(header *http.Header) *url.URL {
@@ -179,7 +208,8 @@ func GetDigest(header *http.Header, digestKey string) string {
 		}
 		key := kv[0]
 		if digestKey == key {
-			return kv[1]
+			val := kv[1]
+			return val[1 : len(val)-1]
 		}
 	}
 	return ""
@@ -200,4 +230,52 @@ func GetUid(req *http.Request) string {
 	ctx := req.Context()
 	session := ctx.Value("session").(*goengine.Session)
 	return session.Get("uid").(string)
+}
+
+type ETag struct {
+	Value string
+	W     bool
+}
+
+func getMatchVal(eTag string) *ETag {
+	length := len(eTag)
+	if 0 == length {
+		return nil
+	}
+	ret := &ETag{Value: "", W: strings.HasPrefix(eTag, "W/\"")}
+	offset := 1
+	if ret.W {
+		offset |= 2
+	}
+	ret.Value = eTag[offset : length-1]
+	if "" == ret.Value {
+		return nil
+	}
+	return ret
+}
+
+func GetMatch(header *http.Header) *ETag {
+	return getMatchVal(header.Get("If-Match"))
+}
+
+func GetNoneMatch(header *http.Header) *ETag {
+	return getMatchVal(header.Get("If-None-Match"))
+}
+
+func GetFileName(pathName string) string {
+	length := len(pathName)
+	i := length - 1
+	if i < 0 {
+		return ""
+	}
+	for ; 0 < i && '/' != pathName[i]; i-- {
+
+	}
+	if '/' == pathName[i] {
+		i++
+	}
+	if length <= i {
+		return ""
+	}
+	return pathName[i:]
 }

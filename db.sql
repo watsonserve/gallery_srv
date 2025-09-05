@@ -3,7 +3,7 @@ CREATE DATABASE res;
 GRANT ALL PRIVILEGES ON DATABASE res TO res;
 
 CREATE TABLE IF NOT EXISTS res_thumb (
-    pid uuid PRIMARY KEY,
+    etag uuid PRIMARY KEY,
     hash char(64) UNIQUE,
     ext char[16],
     raw text UNIQUE,
@@ -13,9 +13,10 @@ CREATE TABLE IF NOT EXISTS res_thumb (
 CREATE TABLE IF NOT EXISTS res_user_img (
     id SERIAL PRIMARY KEY,
     uid uuid,
-    pid uuid,
-    rtime int DEFAULT 0,
-    ctime int
+    filename text,
+    etag uuid,
+    ctime int,
+    rtime int DEFAULT 0
 );
 
 GRANT ALL PRIVILEGES ON TABLE res_thumb TO res;

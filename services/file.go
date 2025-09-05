@@ -1,7 +1,6 @@
 package services
 
 import (
-	"database/sql"
 	"fmt"
 	"io"
 	"net/http"
@@ -9,26 +8,79 @@ import (
 	"path"
 	"strings"
 
+	"github.com/watsonserve/filed/dao"
 	"github.com/watsonserve/filed/helper"
 	"github.com/watsonserve/imghelper"
 )
 
 type FileService struct {
 	rootPath string
+	dbi      *dao.DBI
 }
 
-func NewFileService(dbConn *sql.DB, root string) *FileService {
+const (
+	Removed  = 1 // 001
+	Existed  = 3 // 011
+	NotMatch = 5 // 101
+	ToCreate = 0 // 000
+	ToUpdate = 2 // 010
+)
+
+func NewFileService(dbi *dao.DBI, root string) *FileService {
 	return &FileService{
 		rootPath: path.Clean(root),
+		dbi:      dbi,
 	}
 }
 
-func (d *FileService) GetFilename(req *http.Request) string {
-	return path.Clean(path.Join(d.rootPath, req.URL.Path))
+func (d *FileService) checkOption(uid, fileName, ifMatch string) int {
+	eTagVal, err := d.dbi.Info(uid, fileName)
+
+	// not found
+	if nil != err {
+		if "" == ifMatch {
+			return ToCreate
+		}
+		return Removed
+	}
+
+	if "" == ifMatch {
+		return Existed
+	}
+
+	// not matched
+	if ifMatch != eTagVal {
+		return NotMatch
+	}
+	return ToUpdate
+}
+
+func (d *FileService) getLocalFilename(reqPath, baseName, extName string) string {
+	dirPath := path.Base(path.Dir(reqPath))
+	return path.Clean(path.Join(d.rootPath, dirPath, baseName+extName))
 }
 
 func (d *FileService) SendFile(resp http.ResponseWriter, req *http.Request) {
-	absPath := path.Clean(path.Join(d.rootPath, req.URL.Path))
+	uid := helper.GetUid(req)
+	fileName := helper.GetFileName(req.URL.Path)
+	cachedETag := helper.GetNoneMatch(&req.Header)
+
+	if "" == uid {
+		StdJSONResp(resp, nil, http.StatusUnauthorized, "")
+		return
+	}
+	eTagVal, err := d.dbi.Info(uid, fileName)
+	if nil != err {
+		StdJSONResp(resp, nil, http.StatusNotFound, "")
+		return
+	}
+	if nil != cachedETag && !cachedETag.W && cachedETag.Value == eTagVal {
+		resp.WriteHeader(http.StatusNotModified)
+		resp.Write(nil)
+		return
+	}
+
+	absPath := d.getLocalFilename(req.URL.Path, eTagVal, path.Ext(fileName))
 	fp, err := os.Open(absPath)
 	if nil != err {
 		StdJSONResp(resp, nil, http.StatusNotFound, err.Error())
@@ -46,7 +98,8 @@ func (d *FileService) SendFile(resp http.ResponseWriter, req *http.Request) {
 	respHeader.Set("Content-Type", meta.ContentType)
 	respHeader.Set("Content-Length", fmt.Sprintf("%d", meta.Size))
 	respHeader.Set("Content-Digest", fmt.Sprintf("sha-256=:%s:", meta.Sha256Hash))
-	respHeader.Set("Last-Modified", meta.ModTime.String())
+	// respHeader.Set("Last-Modified", meta.ModTime.String())
+	respHeader.Set("ETag", "\""+eTagVal+"\"")
 	if http.MethodHead == req.Method {
 		resp.Write(nil)
 		return
@@ -57,45 +110,99 @@ func (d *FileService) SendFile(resp http.ResponseWriter, req *http.Request) {
 func (d *FileService) Upload(resp http.ResponseWriter, req *http.Request) {
 	reqHeader := &req.Header
 	cType := strings.Split(reqHeader.Get("Content-Type"), ";")[0]
+	origin := helper.GetOrigin(reqHeader)
+	digest := helper.GetDigest(reqHeader, "sha-256")
+	matchETag := helper.GetMatch(reqHeader)
+	siz := helper.GetContentLength(reqHeader)
+	uid := helper.GetUid(req)
+	fileName := helper.GetFileName(req.URL.Path)
+
+	if "" == uid {
+		StdJSONResp(resp, nil, http.StatusUnauthorized, "")
+		return
+	}
 	if !strings.HasPrefix(cType, "image/") {
 		StdJSONResp(resp, nil, http.StatusUnsupportedMediaType, "Accept Image Only")
 		return
 	}
-	origin := helper.GetOrigin(reqHeader)
 	if nil == origin {
 		StdJSONResp(resp, nil, http.StatusBadRequest, "Header Origin Not Found")
 		return
 	}
-	// hash := helper.GetDigest(reqHeader, "sha-256")
-	// if "" == hash {
-	// 	StdJSONResp(resp, nil, http.StatusBadRequest, "Content-Digest sha-256 Required")
-	// 	return
-	// }
-
-	absPath := d.GetFilename(req)
-	fp, err := os.OpenFile(absPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0660)
-	if nil != err {
-		StdJSONResp(resp, nil, http.StatusNotFound, err.Error())
+	if "" == digest {
+		StdJSONResp(resp, nil, http.StatusBadRequest, "Content-Digest sha-256 Required")
 		return
 	}
-	defer fp.Close()
-	io.Copy(fp, req.Body)
+
+	ifMatch := ""
+	if nil != matchETag {
+		if matchETag.W {
+			StdJSONResp(resp, nil, http.StatusPreconditionFailed, "")
+			return
+		} else {
+			ifMatch = matchETag.Value
+		}
+	}
+
+	opt := d.checkOption(uid, fileName, ifMatch)
+	switch opt {
+	case Removed:
+		StdJSONResp(resp, nil, http.StatusGone, "")
+		return
+	case Existed:
+		StdJSONResp(resp, nil, http.StatusForbidden, "Existed")
+		return
+	case NotMatch:
+		StdJSONResp(resp, nil, http.StatusPreconditionFailed, "")
+		return
+	default:
+	}
+
+	eTagVal, siz, cTime, err := helper.CreateNewFile(path.Join(d.rootPath, "raw"), path.Ext(fileName), digest, req.Body)
+	if nil != err {
+		StdJSONResp(resp, nil, http.StatusServiceUnavailable, err.Error())
+		return
+	}
+
+	if ToCreate == opt {
+		err = d.dbi.Insert(uid, eTagVal, digest, fileName, siz, cTime)
+	} else {
+		err = d.dbi.Update(uid, eTagVal, digest, fileName, siz, cTime)
+	}
+	if nil != err {
+		StdJSONResp(resp, nil, http.StatusBadRequest, err.Error())
+		return
+	}
 	origin.Path = req.URL.Path[4:]
-	resp.Header().Set("Location", origin.String())
-	StdJSONResp(resp, nil, http.StatusSeeOther, "")
+	respHeader := resp.Header()
+	respHeader.Set("Location", origin.String())
+	respHeader.Set("ETag", "\""+eTagVal+"\"")
+	StdJSONResp(resp, nil, http.StatusCreated, "")
 }
 
 func (d *FileService) GenPreview(resp http.ResponseWriter, req *http.Request) {
-	absPath := d.GetFilename(req)
+	reqPath := req.URL.Path
+	uid := helper.GetUid(req)
+	if "" == uid {
+		StdJSONResp(resp, nil, http.StatusUnauthorized, "")
+		return
+	}
+
+	fileName := helper.GetFileName(reqPath)
+	eTagVal, err := d.dbi.Info(uid, fileName)
+	if nil != err {
+		StdJSONResp(resp, nil, http.StatusNotFound, "")
+		return
+	}
+	absPath := path.Join(d.rootPath, "raw", eTagVal+path.Ext(reqPath))
+	preview := path.Join(d.rootPath, "preview", eTagVal) + ".webp"
+	thumb := path.Join(d.rootPath, "thumb", eTagVal) + ".webp"
+
 	mat, err := imghelper.IMRead(absPath)
 	if nil != err {
 		StdJSONResp(resp, nil, http.StatusNotFound, "")
 		return
 	}
-
-	baseName := path.Base(req.URL.Path)
-	preview := path.Join(d.rootPath, "preview", baseName) + ".webp"
-	thumb := path.Join(d.rootPath, "thumb", baseName) + ".webp"
 
 	err = imghelper.IMWrite(mat, preview, 80, 1000)
 	err = imghelper.IMWrite(mat, thumb, 80, 1000)
