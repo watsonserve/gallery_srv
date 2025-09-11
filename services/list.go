@@ -2,9 +2,7 @@ package services
 
 import (
 	"net/http"
-	"os"
 	"path"
-	"time"
 
 	"github.com/watsonserve/filed/dao"
 	"github.com/watsonserve/filed/helper"
@@ -39,8 +37,13 @@ func (d *ListService) List(resp http.ResponseWriter, req *http.Request) {
 }
 
 func (d *ListService) delt(resp http.ResponseWriter, req *http.Request) {
-	hash := req.URL.Path[1:]
-	_, err := d.dao.StmtMap["delt"].Exec(hash, time.Now().Unix())
+	uid := helper.GetUid(req)
+	fileName := helper.GetFileName(req.URL.Path)
+	if "" == uid {
+		StdJSONResp(resp, nil, http.StatusUnauthorized, "")
+		return
+	}
+	err := d.dbi.Del(uid, fileName)
 	if nil != err {
 		StdJSONResp(resp, nil, http.StatusBadRequest, err.Error())
 		return
@@ -50,21 +53,18 @@ func (d *ListService) delt(resp http.ResponseWriter, req *http.Request) {
 }
 
 func (d *ListService) drop(resp http.ResponseWriter, req *http.Request) {
-	hash := req.URL.Path[1:]
-	raw := ""
-	err := d.dao.StmtMap["real_name"].QueryRow(hash).Scan(raw)
+	uid := helper.GetUid(req)
+	fileName := helper.GetFileName(req.URL.Path)
+	if "" == uid {
+		StdJSONResp(resp, nil, http.StatusUnauthorized, "")
+		return
+	}
+	err := d.dbi.Drop(uid, fileName)
 	if nil != err {
 		StdJSONResp(resp, nil, http.StatusBadRequest, err.Error())
 		return
 	}
-	_, err = d.dao.StmtMap["drop"].Exec(hash)
-	if nil != err {
-		StdJSONResp(resp, nil, http.StatusBadRequest, err.Error())
-		return
-	}
-	os.Remove("/thumb/" + hash + ".webp")
-	os.Remove("/preview/" + hash + ".webp")
-	os.Remove(raw)
+
 	StdJSONResp(resp, nil, 0, "")
 }
 

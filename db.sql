@@ -20,8 +20,10 @@ CREATE TABLE IF NOT EXISTS res_user_img (
 );
 
 GRANT ALL PRIVILEGES ON TABLE res_thumb TO res;
-GRANT ALL PRIVILEGES ON SEQUENCE res_thumb_id_seq TO res;
-CREATE INDEX res_ctime_index ON res_thumb(ctime);
-CREATE INDEX res_rtime_index ON res_thumb(rtime);
+GRANT ALL PRIVILEGES ON SEQUENCE res_user_img_id_seq TO res;
+CREATE INDEX res_uid_index ON res_user_img(uid);
+CREATE INDEX res_fn_index ON res_user_img(filename);
+CREATE INDEX res_ctime_index ON res_user_img(ctime);
+CREATE INDEX res_rtime_index ON res_user_img(rtime);
 
 -- select floor(EXTRACT(epoch from ctime)) as ctime from res_thumb;

@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"errors"
 	"path"
+	"time"
 
 	"github.com/watsonserve/filed/helper"
 	"github.com/watsonserve/goengine"
@@ -24,13 +25,18 @@ const selectSQL = "SELECT filename, etag, ctime FROM res_user_img WHERE rtime=0 
 func NewDAO(dbConn *sql.DB, root string) *DBI {
 	dao := goengine.InitDAO(dbConn)
 	dao.Prepare("real_name", "SELECT raw FROM res_thumb WHERE hash=$1")
+	// GET
 	dao.Prepare("info", "SELECT etag FROM res_user_img WHERE uid=$1 AND filename=$2 AND rtime=0")
+	// LIST
 	dao.Prepare("list", selectSQL)
 	dao.Prepare("list_limit", selectSQL+" LIMIT=$3")
-	dao.Prepare("delt", "UPDATE res_thumb SET rtime=$2 WHERE id=$1 AND rtime=0")
-	dao.Prepare("drop", "DELETE FROM res_thumb WHERE id=$1 AND rtime<>0")
+	// DELETE
+	dao.Prepare("delt", "UPDATE res_user_img SET rtime=$3 WHERE uid=$1 AND filename=$2 AND rtime=0")
+	dao.Prepare("drop", "DELETE FROM res_user_img WHERE uid=$1 AND filename=$2 AND rtime<>0")
+	// PUT
 	dao.Prepare("inst", "INSERT INTO res_thumb (etag, hash, ext, size) VALUES ($1, $2, $3, $4)")
 	dao.Prepare("inst_usr", "INSERT INTO res_user_img (uid, filename, etag, ctime) VALUES ($1, $2, $3, $4)")
+	dao.Prepare("updt_usr", "UPDATE res_user_img SET etag=$3 WHERE uid=$1 AND filename=$2 AND rtime=0")
 
 	return &DBI{DAO: *dao}
 }
@@ -93,5 +99,24 @@ func (dbi *DBI) Insert(uid, eTag, hash, filename string, siz, cTime int64) error
 	if nil == err {
 		_, err = dbi.StmtMap["inst_usr"].Exec(uid, filename, eTag, cTime)
 	}
+	return err
+}
+
+func (dbi *DBI) Update(uid, eTag, hash, filename string, siz int64) error {
+	extName := path.Ext(filename)
+	_, err := dbi.StmtMap["inst"].Exec(eTag, hash, extName, siz)
+	if nil == err {
+		_, err = dbi.StmtMap["updt_usr"].Exec(uid, filename, eTag)
+	}
+	return err
+}
+
+func (dbi *DBI) Del(uid, filename string) error {
+	_, err := dbi.StmtMap["delt"].Exec(uid, filename, time.Now().Unix())
+	return err
+}
+
+func (dbi *DBI) Drop(uid, filename string) error {
+	_, err := dbi.StmtMap["drop"].Exec(uid, filename)
 	return err
 }

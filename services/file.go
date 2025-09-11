@@ -95,6 +95,7 @@ func (d *FileService) SendFile(resp http.ResponseWriter, req *http.Request) {
 	}
 
 	respHeader := resp.Header()
+	respHeader.Set("Vary", "Cookie")
 	respHeader.Set("Content-Type", meta.ContentType)
 	respHeader.Set("Content-Length", fmt.Sprintf("%d", meta.Size))
 	respHeader.Set("Content-Digest", fmt.Sprintf("sha-256=:%s:", meta.Sha256Hash))
@@ -167,7 +168,7 @@ func (d *FileService) Upload(resp http.ResponseWriter, req *http.Request) {
 	if ToCreate == opt {
 		err = d.dbi.Insert(uid, eTagVal, digest, fileName, siz, cTime)
 	} else {
-		err = d.dbi.Update(uid, eTagVal, digest, fileName, siz, cTime)
+		err = d.dbi.Update(uid, eTagVal, digest, fileName, siz)
 	}
 	if nil != err {
 		StdJSONResp(resp, nil, http.StatusBadRequest, err.Error())
