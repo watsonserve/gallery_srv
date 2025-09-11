@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/watsonserve/filed/services"
+	"github.com/watsonserve/galleried/services"
 )
 
 type PictureAction struct {

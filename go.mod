@@ -1,4 +1,4 @@
-module github.com/watsonserve/filed
+module github.com/watsonserve/galleried
 
 go 1.23.0
 

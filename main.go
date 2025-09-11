@@ -5,15 +5,41 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/watsonserve/filed/action"
-	"github.com/watsonserve/filed/services"
+	"github.com/watsonserve/galleried/action"
+	"github.com/watsonserve/galleried/dao"
+	"github.com/watsonserve/galleried/services"
 	"github.com/watsonserve/goengine"
 	"github.com/watsonserve/goutils"
 )
 
 func main() {
-	addr := os.Args[1]
-	conf, err := goutils.GetConf("/etc/meta.conf")
+	optionsInfo := []goutils.Option{
+		{
+			Name:      "help",
+			Opt:       'h',
+			Option:    "help",
+			HasParams: false,
+			Desc:      "display help info",
+		},
+		{
+			Name:      "conf",
+			Opt:       'c',
+			Option:    "conf",
+			HasParams: true,
+			Desc:      "configure filename",
+		},
+	}
+	helpInfo := goutils.GenHelp(optionsInfo, "")
+	opts, addr := goutils.GetOptions(optionsInfo)
+	confFile, hasConf := opts["conf"]
+	if _, hasHelp := opts["help"]; hasHelp {
+		fmt.Println(helpInfo)
+		return
+	}
+	if !hasConf {
+		confFile = "/etc/galleried.conf"
+	}
+	conf, err := goutils.GetConf(confFile)
 	if nil != err {
 		fmt.Fprintln(os.Stderr, err.Error())
 		return
@@ -29,15 +55,29 @@ func main() {
 	rootDir := conf["root"][0]
 	fmt.Printf("root: %s\n", rootDir)
 
-	sessMgr := goengine.InitSessionManager(goengine.NewRedisStore("", "", 1), "", "", "", "")
+	sessMgr := goengine.InitSessionManager(
+		goengine.NewRedisStore(conf["redis_address"][0], conf["redis_password"][0], 1),
+		conf["sess_name"][0],
+		conf["cookie_prefix"][0],
+		conf["session_prefix"][0],
+		conf["domain"][0],
+	)
 
-	listSrv := services.NewListService(dbConn, rootDir)
-	fileSrv := services.NewFileService(dbConn, rootDir)
+	dbi := dao.NewDAO(dbConn)
+
+	listSrv := services.NewListService(dbi, rootDir)
+	fileSrv := services.NewFileService(dbi, rootDir)
 
 	p := action.NewPictureAction(listSrv, fileSrv)
 
 	router := goengine.InitHttpRoute()
-	router.StartWith("/Pictures/", p.ServeHTTP)
+	router.StartWith(conf["path_prefix"][0]+"/", p.ServeHTTP)
 	engine := goengine.New(router, sessMgr)
-	http.ListenAndServe(addr, engine)
+
+	listen := conf["listen"][0]
+	listen_1 := addr[0]
+	if "" != listen_1 {
+		listen = listen_1
+	}
+	http.ListenAndServe(listen, engine)
 }

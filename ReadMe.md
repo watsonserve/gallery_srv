@@ -11,56 +11,30 @@ Content-Length: 1000000
 Cookie: abc=def
 ```
 
+## configure
 ```
-func NewFile(req) {
-    eTagVal = GenUUID()
-    fp = createFile(eTagVal)
-    io.Copy(fp, req.Body)
-    hash = sha256(fp)
-    fp.Close()
-    check(hash, ContentDigest)
-    genPreview(fp)
-    return { eTagVal, hash }
-}
+# pg_db
+db_user=foo
+db_passwd=bar
+db_host=127.0.0.2
+db_name=galleried_db
+db_port=5432
 
+#redis
+redis_address=127.0.0.3
+redis_password=
 
-func ServeHTTP(resp, req) {
-    found := CheckExist(req.URL.Path)
-    eTag := req.Header.Get("If-Match")
+#session & cookie
+sess_name=sess
+cookie_prefix=galleried
+session_prefix=galleried
+domain=localhost
 
-    if (!found && !eTag) {
-        { eTagVal, hash } = NewFile(req)
-        res_thumb.Insert(eTagVal, hash, path.Ext(req.Path), ContentLength)
-        res_user_img.Insert(uid, req.Path, eTagVal)
-        resp.WriteHeader(201)
-        return
-    }
+# files store
+root=/home/you/pictures
 
-    if (found && !eTag) {
-        resp.WriteHeader(400)
-        return
-    }
-    if (!found && eTag) {
-        resp.WriteHeader(404)
-        return
-    }
-
-    if (found && eTag) {
-        if isMatch(eTag) {
-            { eTagVal, hash } = NewFile(req)
-            res_thumb.Update(eTagVal, hash, path.Ext(req.Path), ContentLength)
-            res_user_img.Update(uid, req.Path, eTagVal)
-            resp.WriteHeader(201)
-        } else {
-            resp.WriteHeader(400)
-        }
-        return
-    }
-
-    exist = res_user_img.Query(uid, req.Path, eTagVal)
-    if exist {
-        { eTagVal, hash } = NewFile(req)
-
-    }
-}
+# server
+path_prefix=/Pictures
+#listen=127.0.0.1:80
+listen=:80
 ```

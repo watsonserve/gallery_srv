@@ -6,7 +6,7 @@ import (
 	"path"
 	"time"
 
-	"github.com/watsonserve/filed/helper"
+	"github.com/watsonserve/galleried/helper"
 	"github.com/watsonserve/goengine"
 )
 
@@ -22,7 +22,7 @@ type ResUserImg struct {
 
 const selectSQL = "SELECT filename, etag, ctime FROM res_user_img WHERE rtime=0 AND uid=$1 ORDER BY ctime DESC OFFSET=$2"
 
-func NewDAO(dbConn *sql.DB, root string) *DBI {
+func NewDAO(dbConn *sql.DB) *DBI {
 	dao := goengine.InitDAO(dbConn)
 	dao.Prepare("real_name", "SELECT raw FROM res_thumb WHERE hash=$1")
 	// GET

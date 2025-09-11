@@ -4,8 +4,8 @@ import (
 	"net/http"
 	"path"
 
-	"github.com/watsonserve/filed/dao"
-	"github.com/watsonserve/filed/helper"
+	"github.com/watsonserve/galleried/dao"
+	"github.com/watsonserve/galleried/helper"
 )
 
 type ListService struct {
