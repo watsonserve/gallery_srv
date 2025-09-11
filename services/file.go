@@ -10,7 +10,6 @@ import (
 
 	"github.com/watsonserve/galleried/dao"
 	"github.com/watsonserve/galleried/helper"
-	"github.com/watsonserve/imghelper"
 )
 
 type FileService struct {
@@ -182,31 +181,24 @@ func (d *FileService) Upload(resp http.ResponseWriter, req *http.Request) {
 }
 
 func (d *FileService) GenPreview(resp http.ResponseWriter, req *http.Request) {
-	reqPath := req.URL.Path
+	fileName := helper.GetFileName(req.URL.Path)
 	uid := helper.GetUid(req)
 	if "" == uid {
 		StdJSONResp(resp, nil, http.StatusUnauthorized, "")
 		return
 	}
 
-	fileName := helper.GetFileName(reqPath)
 	eTagVal, err := d.dbi.Info(uid, fileName)
 	if nil != err {
 		StdJSONResp(resp, nil, http.StatusNotFound, "")
 		return
 	}
-	absPath := path.Join(d.rootPath, "raw", eTagVal+path.Ext(reqPath))
-	preview := path.Join(d.rootPath, "preview", eTagVal) + ".webp"
-	thumb := path.Join(d.rootPath, "thumb", eTagVal) + ".webp"
 
-	mat, err := imghelper.IMRead(absPath)
+	err = helper.GenPreview(d.rootPath, eTagVal, path.Ext(fileName))
 	if nil != err {
-		StdJSONResp(resp, nil, http.StatusNotFound, "")
+		StdJSONResp(resp, nil, http.StatusNotFound, err.Error())
 		return
 	}
-
-	err = imghelper.IMWrite(mat, preview, 80, 1000)
-	err = imghelper.IMWrite(mat, thumb, 80, 1000)
 	StdJSONResp(resp, nil, http.StatusCreated, "")
 }
 

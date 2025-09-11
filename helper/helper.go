@@ -16,6 +16,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/watsonserve/goengine"
+	"github.com/watsonserve/imghelper"
 )
 
 func GenUUIDStr() (string, error) {
@@ -278,4 +279,22 @@ func GetFileName(pathName string) string {
 		return ""
 	}
 	return pathName[i:]
+}
+
+func GenPreview(rootPath, baseName, extName string) error {
+	absPath := path.Join(rootPath, "raw", baseName+extName)
+	genFile := baseName + ".webp"
+	preview := path.Join(rootPath, "preview", genFile)
+	thumb := path.Join(rootPath, "thumb", genFile)
+
+	mat, err := imghelper.IMRead(absPath)
+	if nil != err {
+		return err
+	}
+
+	err = imghelper.IMWrite(mat, preview, 64, 960)
+	if nil == err {
+		err = imghelper.IMWrite(mat, thumb, 50, 320)
+	}
+	return err
 }
