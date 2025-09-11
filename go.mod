@@ -6,7 +6,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/watsonserve/goengine v0.1.9
 	github.com/watsonserve/goutils v0.1.18
-	github.com/watsonserve/imghelper v0.0.3
+	github.com/watsonserve/imghelper v0.0.4
 )
 
 require (

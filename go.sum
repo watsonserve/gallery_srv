@@ -68,8 +68,8 @@ github.com/watsonserve/goengine v0.1.9 h1:mqmXhZprEeAH03wcJaYv1Bhn7mPxijDlGofLTZ
 github.com/watsonserve/goengine v0.1.9/go.mod h1:wEYVDqUPyw/G+a/1aNjCjVuP53XhGJu3rL3IDy5VkUo=
 github.com/watsonserve/goutils v0.1.18 h1:GsO+9LtgDJNL1e6hQHC9bB0tRPDfYNxzyRfTEV4VRbk=
 github.com/watsonserve/goutils v0.1.18/go.mod h1:jKpQDNhuTji5FnQwtlmtFVKCzura1VhaqvNUueCx5nY=
-github.com/watsonserve/imghelper v0.0.3 h1:CYOPEeKYkm3payaeCfovzgT3XCE/BJfAuCEyMVASMV0=
-github.com/watsonserve/imghelper v0.0.3/go.mod h1:gvl+aJqnssQh0l0K2ZCh855j7IuOuodF8eu2PZXP7To=
+github.com/watsonserve/imghelper v0.0.4 h1:bqZ1WF/R7TaQ/ezZo3RLK3MJWPewDUwRSknYSppGsVQ=
+github.com/watsonserve/imghelper v0.0.4/go.mod h1:gvl+aJqnssQh0l0K2ZCh855j7IuOuodF8eu2PZXP7To=
 github.com/xdg-go/pbkdf2 v1.0.0 h1:Su7DPu48wXMwC3bs7MCNG+z4FhcyEuz5dlvchbq0B0c=
 github.com/xdg-go/pbkdf2 v1.0.0/go.mod h1:jrpuAogTd400dnrH08LKmI/xc1MbPOebTwRqcT5RDeI=
 github.com/xdg-go/scram v1.1.2 h1:FHX5I5B4i4hKRVRBCFRxq1iQRej7WO3hhBuJf+UUySY=
